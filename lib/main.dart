@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'login_page.dart';
 import 'home_page.dart';
-import 'register_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +14,8 @@ void main() async {
   runApp(const MyApp());
 }
 
+final supabase = Supabase.instance.client;
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -23,14 +23,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-
-      initialRoute: '/',
-
-      routes: {
-        '/': (_) => const LoginPage(),
-        '/home': (_) => const HomePage(),
-        '/register': (_) => const RegisterPage(),
-      },
+      title: 'Controle',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: supabase.auth.currentSession == null
+          ? const LoginPage()
+          : const HomePage(),
     );
   }
 }
