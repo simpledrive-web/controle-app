@@ -1,80 +1,160 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-Color getCategoryColor(String nome) {
-  final colors = [
-    Colors.blue,
-    Colors.red,
-    Colors.green,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-    Colors.pink,
-  ];
-  return colors[nome.hashCode % colors.length];
-}
-
 class GraphsPage extends StatelessWidget {
-  final List<Map<String, dynamic>> expenses;
+  final List gastos;
+  final List categorias;
 
-  const GraphsPage({super.key, required this.expenses});
+  const GraphsPage(this.gastos, this.categorias, {super.key});
+
+  Color getColor(String? color) {
+    switch (color) {
+      case 'red':
+        return Colors.red;
+      case 'green':
+        return Colors.green;
+      case 'orange':
+        return Colors.orange;
+      case 'blue':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    Map<String, double> data = {};
+    Map<String, double> dados = {};
+    Map<String, Color> cores = {};
 
-    for (var e in expenses) {
-      final nome = e['categories']?['nome'] ?? 'Sem categoria';
-      data[nome] = (data[nome] ?? 0) + (e['valor'] ?? 0);
+    // 🔥 AGRUPAR DADOS
+    for (var g in gastos) {
+      final valor = (g['amount'] ?? 0).toDouble();
+
+      final cat = categorias.firstWhere(
+        (c) => c['id'].toString() ==
+            g['category_id'].toString(),
+        orElse: () => {
+          'name': 'Outros',
+          'color': 'blue'
+        },
+      );
+
+      final nome = cat['name'] ?? 'Outros';
+
+      dados[nome] = (dados[nome] ?? 0) + valor;
+      cores[nome] = getColor(cat['color']);
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("Gráficos 📊")),
-      body: Column(
-        children: [
-          const SizedBox(height: 20),
+    final total = dados.values.fold(0.0, (a, b) => a + b);
 
-          /// GRAFICO ANIMADO
-          Expanded(
-            child: PieChart(
-              PieChartData(
-                sections: data.entries.map((e) {
-                  return PieChartSectionData(
-                    value: e.value,
-                    title: "",
-                    radius: 80,
-                    color: getCategoryColor(e.key),
+    final sections = dados.entries.map((e) {
+      final porcentagem =
+          total == 0 ? 0 : (e.value / total * 100);
+
+      return PieChartSectionData(
+        value: e.value,
+        title: "${porcentagem.toStringAsFixed(0)}%",
+        color: cores[e.key],
+        radius: 100,
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      );
+    }).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Dashboard 📊"),
+      ),
+      body: Container(
+        color: const Color(0xFFD6EAF8), // azul bebê
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+
+            // 🔥 TOTAL
+            Text(
+              "Total gasto: R\$ ${total.toStringAsFixed(2)}",
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // 🔥 GRÁFICO PIZZA
+            SizedBox(
+              height: 250,
+              child: PieChart(
+                PieChartData(
+                  sections: sections,
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 40,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // 🔥 LEGENDA BONITA
+            Expanded(
+              child: ListView(
+                children: dados.entries.map((e) {
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: cores[e.key],
+                    ),
+                    title: Text(e.key),
+                    trailing: Text(
+                      "R\$ ${e.value.toStringAsFixed(2)}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   );
                 }).toList(),
-                centerSpaceRadius: 40,
               ),
-              swapAnimationDuration: const Duration(milliseconds: 800),
             ),
-          ),
 
-          /// LEGENDA COLORIDA
-          ...data.entries.map((e) {
-            final cor = getCategoryColor(e.key);
+            const SizedBox(height: 10),
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(width: 12, height: 12, color: cor),
-                      const SizedBox(width: 8),
-                      Text(e.key, style: TextStyle(color: cor)),
-                    ],
-                  ),
-                  Text("R\$ ${e.value.toStringAsFixed(2)}"),
-                ],
+            // 🔥 GRÁFICO DE BARRAS
+            SizedBox(
+              height: 150,
+              child: BarChart(
+                BarChartData(
+                  titlesData: FlTitlesData(show: false),
+                  borderData: FlBorderData(show: false),
+                  barGroups: dados.entries
+                      .toList()
+                      .asMap()
+                      .entries
+                      .map((entry) {
+                    final index = entry.key;
+                    final value = entry.value;
+
+                    return BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        BarChartRodData(
+                          toY: value.value,
+                          color: cores[value.key],
+                          width: 18,
+                          borderRadius:
+                              BorderRadius.circular(6),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
               ),
-            );
-          }),
-          const SizedBox(height: 20),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
