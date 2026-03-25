@@ -20,7 +20,7 @@ dependencies:
   flutter_riverpod: ^2.5.0
 
   # 🔥 GRÁFICOS (dashboard)
-  fl_chart: ^0.66.0
+  fl_chart: ^1.2.0
 
   # 🔥 PDF (você já usa)
   pdf: ^3.12.0

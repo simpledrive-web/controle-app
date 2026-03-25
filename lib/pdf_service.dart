@@ -1,135 +1,95 @@
-import 'dart:html' as html;
-import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
-Future gerarPDF(List gastos, List categorias) async {
+Future gerarPDF(List lista, List categorias) async {
   final pdf = pw.Document();
 
   double total = 0;
-
-  // 🔥 CALCULAR TOTAL
-  for (var g in gastos) {
-    final valor = (g['amount'] ?? 0).toDouble();
-    total += valor;
+  for (var g in lista) {
+    total += (g['amount'] ?? 0).toDouble();
   }
 
   pdf.addPage(
     pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      build: (pw.Context context) {
-        return pw.Container(
-          padding: const pw.EdgeInsets.all(20),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // 🔥 TÍTULO
-              pw.Text(
-                "Relatório Financeiro",
-                style: pw.TextStyle(
-                  fontSize: 26,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.blue,
-                ),
+      build: (context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              "Relatório Financeiro",
+              style: pw.TextStyle(
+                fontSize: 28,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue,
               ),
+            ),
 
-              pw.SizedBox(height: 10),
+            pw.SizedBox(height: 20),
 
-              // 🔥 TOTAL
-              pw.Container(
+            pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.blue100,
+                borderRadius: pw.BorderRadius.circular(10),
+              ),
+              child: pw.Text(
+                "Total gasto: R\$ ${total.toStringAsFixed(2)}",
+                style: pw.TextStyle(fontSize: 16),
+              ),
+            ),
+
+            pw.SizedBox(height: 20),
+
+            ...lista.map((g) {
+              final cat = categorias.firstWhere(
+                (c) => c['id'].toString() ==
+                    g['category_id'].toString(),
+                orElse: () => <String, dynamic>{},
+              );
+
+              return pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 10),
                 padding: const pw.EdgeInsets.all(10),
                 decoration: pw.BoxDecoration(
-                  color: PdfColors.blue100,
-                  borderRadius: pw.BorderRadius.circular(8),
+                  border: pw.Border.all(color: PdfColors.grey),
+                  borderRadius: pw.BorderRadius.circular(10),
                 ),
-                child: pw.Text(
-                  "Total gasto: R\$ ${total.toStringAsFixed(2)}",
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              pw.SizedBox(height: 20),
-
-              // 🔥 LISTA DE GASTOS
-              ...gastos.map((g) {
-                final valor = (g['amount'] ?? 0).toDouble();
-
-                final cat = categorias.firstWhere(
-                  (c) => c['id'].toString() ==
-                      g['category_id'].toString(),
-                  orElse: () => {'name': 'Sem categoria'},
-                );
-
-                return pw.Container(
-                  margin: const pw.EdgeInsets.only(bottom: 10),
-                  padding: const pw.EdgeInsets.all(12),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey300),
-                    borderRadius: pw.BorderRadius.circular(10),
-                  ),
-                  child: pw.Row(
-                    mainAxisAlignment:
-                        pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Column(
-                        crossAxisAlignment:
-                            pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(
-                            g['description'] ?? '',
-                            style: pw.TextStyle(
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                          pw.Text(
-                            cat['name'] ?? '',
-                            style: pw.TextStyle(
-                              fontSize: 10,
-                              color: PdfColors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                      pw.Text(
-                        "R\$ ${valor.toStringAsFixed(2)}",
-                        style: pw.TextStyle(
-                          color: PdfColors.red,
-                          fontWeight: pw.FontWeight.bold,
+                child: pw.Row(
+                  mainAxisAlignment:
+                      pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment:
+                          pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(g['description'] ?? ''),
+                        pw.Text(
+                          cat['name'] ?? '',
+                          style: pw.TextStyle(
+                              color: PdfColors.grey),
                         ),
+                      ],
+                    ),
+                    pw.Text(
+                      "R\$ ${g['amount']}",
+                      style: pw.TextStyle(
+                        color: PdfColors.red,
+                        fontWeight: pw.FontWeight.bold,
                       ),
-                    ],
-                  ),
-                );
-              }).toList(),
-
-              pw.SizedBox(height: 20),
-
-              // 🔥 RODAPÉ
-              pw.Divider(),
-              pw.Text(
-                "Gerado automaticamente pelo app",
-                style: pw.TextStyle(
-                  fontSize: 10,
-                  color: PdfColors.grey,
+                    )
+                  ],
                 ),
-              ),
-            ],
-          ),
+              );
+            })
+          ],
         );
       },
     ),
   );
 
-  final bytes = await pdf.save();
-
-  final blob = html.Blob([bytes]);
-  final url = html.Url.createObjectUrlFromBlob(blob);
-
-  final anchor = html.AnchorElement(href: url)
-    ..setAttribute("download", "relatorio_financeiro.pdf")
-    ..click();
-
-  html.Url.revokeObjectUrl(url);
+  await Printing.sharePdf(
+    bytes: await pdf.save(),
+    filename: 'relatorio_financeiro.pdf',
+  );
 }

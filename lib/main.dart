@@ -24,10 +24,21 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Controle',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: supabase.auth.currentSession == null
-          ? const LoginPage()
-          : const HomePage(),
+      theme: ThemeData(primarySwatch: Colors.deepPurple),
+
+      // 🔥 AQUI É O SEGREDO
+      home: StreamBuilder<AuthState>(
+        stream: supabase.auth.onAuthStateChange,
+        builder: (context, snapshot) {
+          final session = supabase.auth.currentSession;
+
+          if (session == null) {
+            return const LoginPage();
+          } else {
+            return const HomePage();
+          }
+        },
+      ),
     );
   }
 }
