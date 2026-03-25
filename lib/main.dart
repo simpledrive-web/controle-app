@@ -26,7 +26,6 @@ class MyApp extends StatelessWidget {
       title: 'Controle',
       theme: ThemeData(primarySwatch: Colors.deepPurple),
 
-      // 🔥 AQUI É O SEGREDO
       home: StreamBuilder<AuthState>(
         stream: supabase.auth.onAuthStateChange,
         builder: (context, snapshot) {

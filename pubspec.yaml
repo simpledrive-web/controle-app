@@ -1,11 +1,11 @@
 name: controle
-description: "A new Flutter project."
+description: App de controle financeiro
 publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.11.1
+  sdk: ">=3.1.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -22,14 +22,13 @@ dependencies:
   # 🔥 GRÁFICOS (dashboard)
   fl_chart: ^1.2.0
 
-  # 🔥 PDF (você já usa)
+  # 🔥 PDF
   pdf: ^3.12.0
   printing: ^5.14.3
 
-  # 🔥 FORMATOS (datas, moeda)
+  # 🔥 FORMATOS
   intl: ^0.18.0
   app_links: ^6.4.1
-
 
 dev_dependencies:
   flutter_test:
@@ -37,5 +36,17 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
 
+  # 🔥 ÍCONE DO APP
+  flutter_launcher_icons: ^0.13.1
+
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/icon.png
+
+# 🔥 CONFIG DO ÍCONE
+flutter_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon.png"
