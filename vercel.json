@@ -1,5 +1,4 @@
 {
-  "outputDirectory": "web_build",
   "routes": [
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
