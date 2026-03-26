@@ -98,7 +98,6 @@ class _HomePageState extends State<HomePage> {
         0, (sum, e) => sum + (e['amount'] as num).toDouble());
   }
 
-  // 🔥 EDITAR GASTO
   void editarGasto(Map<String, dynamic> item) {
     final nome = TextEditingController(text: item['name']);
     final valor =
@@ -147,8 +146,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  Future<void> excluirGasto(String id, double valor) async {
+    Future<void> excluirGasto(String id, double valor) async {
     final confirmar = await showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -194,21 +192,57 @@ class _HomePageState extends State<HomePage> {
     if (mounted) Navigator.pop(context);
   }
 
+  // 🔥 NOVO: MENU DE SALDO
   void adicionarSaldo() {
-    final valor = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add, color: Colors.green),
+              title: const Text("Adicionar saldo"),
+              onTap: () {
+                Navigator.pop(context);
+                _dialogAdicionarRemover(true);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.remove, color: Colors.red),
+              title: const Text("Remover saldo"),
+              onTap: () {
+                Navigator.pop(context);
+                _dialogAdicionarRemover(false);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🔥 NOVO: LÓGICA DE SALDO
+  void _dialogAdicionarRemover(bool isAdicionar) {
+    final controller = TextEditingController();
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Adicionar saldo"),
+        title: Text(isAdicionar ? "Adicionar saldo" : "Remover saldo"),
         content: TextField(
-          controller: valor,
+          controller: controller,
           keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            hintText: "Digite o valor",
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () async {
-              final v = double.tryParse(valor.text) ?? 0;
+              final valor = double.tryParse(controller.text);
+              if (valor == null) return;
+
               final user = supabase.auth.currentUser;
 
               final existing = await supabase
@@ -219,9 +253,25 @@ class _HomePageState extends State<HomePage> {
 
               final atual = existing?['amount']?.toDouble() ?? 0;
 
+              double novoSaldo;
+
+              if (isAdicionar) {
+                novoSaldo = atual + valor;
+              } else {
+                if (valor > atual) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Saldo insuficiente"),
+                    ),
+                  );
+                  return;
+                }
+                novoSaldo = atual - valor;
+              }
+
               await supabase.from('balance').upsert({
                 'user_id': user.id,
-                'amount': atual + v,
+                'amount': novoSaldo,
               }, onConflict: 'user_id');
 
               Navigator.pop(context);
@@ -277,8 +327,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  void novoGasto() {
+    void novoGasto() {
     final nome = TextEditingController();
     final valor = TextEditingController();
     String? catId;

@@ -64,7 +64,7 @@ class _LoginPageState extends State<LoginPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  "Controle 💜",
+                  "Controle",
                   style: TextStyle(
                       fontSize: 26, fontWeight: FontWeight.bold),
                 ),
