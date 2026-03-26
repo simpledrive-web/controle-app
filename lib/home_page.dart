@@ -36,10 +36,11 @@ class _HomePageState extends State<HomePage> {
         .select()
         .eq('user_id', user!.id);
 
+    // ✅ CORREÇÃO AQUI
     final cats = await supabase
         .from('categories')
         .select()
-        .eq('user_id', user.id);
+        .or('user_id.is.null,user_id.eq.${user.id}');
 
     expenses = List<Map<String, dynamic>>.from(data);
     categorias = List<Map<String, dynamic>>.from(cats);
@@ -273,8 +274,6 @@ class _HomePageState extends State<HomePage> {
                   MaterialPageRoute(builder: (_) => const GraphsPage()));
             },
           ),
-
-          // 🔥 LOGOUT ADICIONADO
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () async {
@@ -303,7 +302,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -321,7 +319,6 @@ class _HomePageState extends State<HomePage> {
               onPressed: novoGasto, child: const Icon(Icons.add)),
         ],
       ),
-
       body: Column(
         children: [
           Container(
@@ -342,7 +339,6 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -377,7 +373,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.only(bottom: 100),
