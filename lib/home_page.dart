@@ -19,7 +19,7 @@ class _HomePageState extends State<HomePage> {
   double saldo = 0;
   double totalDespesas = 0;
 
-  String mesSelecionado = "Todos";
+  DateTime? dataSelecionada;
   String categoriaSelecionada = "Todas";
 
   @override
@@ -36,7 +36,6 @@ class _HomePageState extends State<HomePage> {
         .select()
         .eq('user_id', user!.id);
 
-    // ✅ CORREÇÃO AQUI
     final cats = await supabase
         .from('categories')
         .select()
@@ -58,13 +57,33 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
+  // 🔥 NOVO: selecionar data
+  Future selecionarData() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+
+    if (picked != null) {
+      setState(() {
+        dataSelecionada = picked;
+        aplicarFiltro();
+      });
+    }
+  }
+
   void aplicarFiltro() {
     List<Map<String, dynamic>> filtrados = expenses;
 
-    if (mesSelecionado != "Todos") {
+    // 🔥 filtro por DIA
+    if (dataSelecionada != null) {
       filtrados = filtrados.where((e) {
         final d = DateTime.parse(e['created_at']);
-        return d.month.toString() == mesSelecionado;
+        return d.year == dataSelecionada!.year &&
+            d.month == dataSelecionada!.month &&
+            d.day == dataSelecionada!.day;
       }).toList();
     }
 
@@ -80,6 +99,50 @@ class _HomePageState extends State<HomePage> {
 
     totalDespesas = filtrados.fold(
         0, (sum, e) => sum + (e['amount'] as num).toDouble());
+  }
+
+  Future<void> excluirGasto(String id, double valor) async {
+    final confirmar = await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Excluir gasto"),
+        content: const Text("Tem certeza que deseja excluir?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancelar"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Excluir"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    final user = supabase.auth.currentUser;
+
+    await supabase.from('expenses').delete().eq('id', id);
+
+    final existing = await supabase
+        .from('balance')
+        .select()
+        .eq('user_id', user!.id)
+        .maybeSingle();
+
+    final atual = existing?['amount']?.toDouble() ?? 0;
+
+    await supabase.from('balance').upsert(
+      {
+        'user_id': user.id,
+        'amount': atual + valor,
+      },
+      onConflict: 'user_id',
+    );
+
+    loadData();
   }
 
   void adicionarSaldo() {
@@ -240,10 +303,12 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     List<Map<String, dynamic>> listaFiltrada = expenses;
 
-    if (mesSelecionado != "Todos") {
+    if (dataSelecionada != null) {
       listaFiltrada = listaFiltrada.where((e) {
         final d = DateTime.parse(e['created_at']);
-        return d.month.toString() == mesSelecionado;
+        return d.year == dataSelecionada!.year &&
+            d.month == dataSelecionada!.month &&
+            d.day == dataSelecionada!.day;
       }).toList();
     }
 
@@ -262,120 +327,38 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.deepPurple,
         title: const Text("Controle 💜",
             style: TextStyle(color: Colors.white)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-            onPressed: () => gerarPDF(listaFiltrada, categorias),
-          ),
-          IconButton(
-            icon: const Icon(Icons.bar_chart, color: Colors.white),
-            onPressed: () {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const GraphsPage()));
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () async {
-              final confirmar = await showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text("Sair"),
-                  content: const Text("Deseja sair da conta?"),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text("Cancelar"),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text("Sair"),
-                    ),
-                  ],
-                ),
-              );
-
-              if (confirmar == true) {
-                await supabase.auth.signOut();
-              }
-            },
-          ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-              backgroundColor: Colors.green,
-              onPressed: adicionarSaldo,
-              child: const Icon(Icons.attach_money)),
-          const SizedBox(height: 10),
-          FloatingActionButton(
-              backgroundColor: Colors.orange,
-              onPressed: novaCategoria,
-              child: const Icon(Icons.category)),
-          const SizedBox(height: 10),
-          FloatingActionButton(
-              onPressed: novoGasto, child: const Icon(Icons.add)),
-        ],
       ),
       body: Column(
         children: [
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xff6a11cb), Color(0xff2575fc)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                Text("Saldo: R\$ ${saldo.toStringAsFixed(2)}",
-                    style: const TextStyle(color: Colors.white)),
-                Text("Despesas: R\$ ${totalDespesas.toStringAsFixed(2)}",
-                    style: const TextStyle(color: Colors.white70)),
-              ],
-            ),
-          ),
+          const SizedBox(height: 10),
+
+          // 🔥 BOTÕES NOVOS
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              DropdownButton(
-                value: mesSelecionado,
-                items: ["Todos", "1", "2", "3", "4", "5", "6"]
-                    .map((m) =>
-                        DropdownMenuItem(value: m, child: Text("Mês $m")))
-                    .toList(),
-                onChanged: (v) {
-                  setState(() {
-                    mesSelecionado = v!;
-                    aplicarFiltro();
-                  });
-                },
+              ElevatedButton(
+                onPressed: selecionarData,
+                child: Text(
+                  dataSelecionada == null
+                      ? "Selecionar data"
+                      : "${dataSelecionada!.day}/${dataSelecionada!.month}/${dataSelecionada!.year}",
+                ),
               ),
-              DropdownButton(
-                value: categoriaSelecionada,
-                items: [
-                  "Todas",
-                  ...categorias.map((c) => c['name'] as String)
-                ]
-                    .map((c) =>
-                        DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) {
+              const SizedBox(width: 10),
+              TextButton(
+                onPressed: () {
                   setState(() {
-                    categoriaSelecionada = v!;
+                    dataSelecionada = null;
                     aplicarFiltro();
                   });
                 },
+                child: const Text("Limpar"),
               ),
             ],
           ),
+
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 100),
               itemCount: listaFiltrada.length,
               itemBuilder: (_, i) {
                 final item = listaFiltrada[i];
@@ -386,30 +369,24 @@ class _HomePageState extends State<HomePage> {
                         item['category_id'].toString(),
                     orElse: () => {});
 
-                return Center(
-                  child: Container(
-                    width: MediaQuery.of(context).size.width * 0.9,
-                    margin: const EdgeInsets.symmetric(vertical: 6),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 4,
-                        )
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Text(cat['emoji'] ?? "💰"),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(item['name'] ?? "")),
-                        Text("- R\$ ${item['amount']}",
-                            style: const TextStyle(color: Colors.red)),
-                      ],
-                    ),
+                return ListTile(
+                  title: Text(item['name'] ?? ""),
+                  subtitle: Text(cat['name'] ?? ""),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'excluir') {
+                        excluirGasto(
+                          item['id'].toString(),
+                          (item['amount'] as num).toDouble(),
+                        );
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'excluir',
+                        child: Text('Excluir'),
+                      ),
+                    ],
                   ),
                 );
               },
