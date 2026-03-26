@@ -98,7 +98,7 @@ class _HomePageState extends State<HomePage> {
         0, (sum, e) => sum + (e['amount'] as num).toDouble());
   }
 
-  // 🔥 EDITAR GASTO (NOVO)
+  // 🔥 EDITAR GASTO
   void editarGasto(Map<String, dynamic> item) {
     final nome = TextEditingController(text: item['name']);
     final valor =
@@ -194,6 +194,154 @@ class _HomePageState extends State<HomePage> {
     if (mounted) Navigator.pop(context);
   }
 
+  void adicionarSaldo() {
+    final valor = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Adicionar saldo"),
+        content: TextField(
+          controller: valor,
+          keyboardType: TextInputType.number,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final v = double.tryParse(valor.text) ?? 0;
+              final user = supabase.auth.currentUser;
+
+              final existing = await supabase
+                  .from('balance')
+                  .select()
+                  .eq('user_id', user!.id)
+                  .maybeSingle();
+
+              final atual = existing?['amount']?.toDouble() ?? 0;
+
+              await supabase.from('balance').upsert({
+                'user_id': user.id,
+                'amount': atual + v,
+              }, onConflict: 'user_id');
+
+              Navigator.pop(context);
+              loadData();
+            },
+            child: const Text("Salvar"),
+          )
+        ],
+      ),
+    );
+  }
+
+  void novaCategoria() {
+    final nome = TextEditingController();
+    String cor = "blue";
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Nova categoria"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nome),
+            DropdownButtonFormField<String>(
+              value: cor,
+              items: ["blue", "red", "green", "orange", "purple"]
+                  .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c),
+                      ))
+                  .toList(),
+              onChanged: (v) => cor = v!,
+            )
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await supabase.from('categories').insert({
+                'name': nome.text,
+                'color': cor,
+                'emoji': '💰',
+                'user_id': supabase.auth.currentUser!.id,
+              });
+
+              Navigator.pop(context);
+              loadData();
+            },
+            child: const Text("Salvar"),
+          )
+        ],
+      ),
+    );
+  }
+
+  void novoGasto() {
+    final nome = TextEditingController();
+    final valor = TextEditingController();
+    String? catId;
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Novo gasto"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nome),
+            TextField(controller: valor, keyboardType: TextInputType.number),
+            DropdownButtonFormField<String>(
+              items: categorias.map((c) {
+                return DropdownMenuItem(
+                  value: c['id'].toString(),
+                  child: Text("${c['emoji']} ${c['name']}"),
+                );
+              }).toList(),
+              onChanged: (v) => catId = v,
+            )
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final v = double.tryParse(valor.text);
+              if (v == null || catId == null) return;
+
+              final user = supabase.auth.currentUser;
+
+              await supabase.from('expenses').insert({
+                'name': nome.text,
+                'amount': v,
+                'category_id': catId,
+                'user_id': user!.id,
+                'created_at': DateTime.now().toIso8601String(),
+              });
+
+              final existing = await supabase
+                  .from('balance')
+                  .select()
+                  .eq('user_id', user.id)
+                  .maybeSingle();
+
+              final atual = existing?['amount']?.toDouble() ?? 0;
+
+              await supabase.from('balance').upsert({
+                'user_id': user.id,
+                'amount': atual - v,
+              }, onConflict: 'user_id');
+
+              Navigator.pop(context);
+              loadData();
+            },
+            child: const Text("Salvar"),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     List<Map<String, dynamic>> listaFiltrada = expenses;
@@ -220,7 +368,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.deepPurple,
-        title: const Text("Controle", // 🔥 sem coração
+        title: const Text("Controle",
             style: TextStyle(color: Colors.white)),
         actions: [
           IconButton(
@@ -240,9 +388,43 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+              backgroundColor: Colors.green,
+              onPressed: adicionarSaldo,
+              child: const Icon(Icons.attach_money)),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+              backgroundColor: Colors.orange,
+              onPressed: novaCategoria,
+              child: const Icon(Icons.category)),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+              onPressed: novoGasto, child: const Icon(Icons.add)),
+        ],
+      ),
       body: Column(
         children: [
-          const SizedBox(height: 20),
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xff6a11cb), Color(0xff2575fc)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Text("Saldo: R\$ ${saldo.toStringAsFixed(2)}",
+                    style: const TextStyle(color: Colors.white)),
+                Text("Despesas: R\$ ${totalDespesas.toStringAsFixed(2)}",
+                    style: const TextStyle(color: Colors.white70)),
+              ],
+            ),
+          ),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -264,45 +446,78 @@ class _HomePageState extends State<HomePage> {
                 },
                 child: const Text("Limpar"),
               ),
+              DropdownButton(
+                value: categoriaSelecionada,
+                items: [
+                  "Todas",
+                  ...categorias.map((c) => c['name'] as String)
+                ]
+                    .map((c) =>
+                        DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (v) {
+                  setState(() {
+                    categoriaSelecionada = v!;
+                    aplicarFiltro();
+                  });
+                },
+              ),
             ],
           ),
 
           Expanded(
             child: ListView.builder(
+              padding: const EdgeInsets.only(bottom: 100),
               itemCount: listaFiltrada.length,
               itemBuilder: (_, i) {
                 final item = listaFiltrada[i];
 
-                return ListTile(
-                  title: Text(item['name']),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text("- R\$ ${item['amount']}",
-                          style: const TextStyle(color: Colors.red)),
-                      PopupMenuButton<String>(
-                        onSelected: (value) {
-                          if (value == 'editar') {
-                            editarGasto(item);
-                          } else if (value == 'excluir') {
-                            excluirGasto(
-                              item['id'].toString(),
-                              (item['amount'] as num).toDouble(),
-                            );
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'editar',
-                            child: Text('Editar'),
-                          ),
-                          const PopupMenuItem(
-                            value: 'excluir',
-                            child: Text('Excluir'),
-                          ),
-                        ],
-                      ),
-                    ],
+                final cat = categorias.firstWhere(
+                    (c) =>
+                        c['id'].toString() ==
+                        item['category_id'].toString(),
+                    orElse: () => {});
+
+                return Center(
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.9,
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(cat['emoji'] ?? "💰"),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(item['name'] ?? "")),
+                        Text("- R\$ ${item['amount']}",
+                            style: const TextStyle(color: Colors.red)),
+                        PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'editar') {
+                              editarGasto(item);
+                            } else if (value == 'excluir') {
+                              excluirGasto(
+                                item['id'].toString(),
+                                (item['amount'] as num).toDouble(),
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'editar',
+                              child: Text('Editar'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'excluir',
+                              child: Text('Excluir'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
