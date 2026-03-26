@@ -19,7 +19,7 @@ class _HomePageState extends State<HomePage> {
   double saldo = 0;
   double totalDespesas = 0;
 
-  DateTime? dataSelecionada;
+  DateTime? dataSelecionada; // 🔥 NOVO
   String categoriaSelecionada = "Todas";
 
   @override
@@ -53,11 +53,10 @@ class _HomePageState extends State<HomePage> {
     saldo = balance?['amount']?.toDouble() ?? 0;
 
     aplicarFiltro();
-
     setState(() {});
   }
 
-  // 🔥 NOVO: selecionar data
+  // 🔥 CALENDÁRIO
   Future selecionarData() async {
     final picked = await showDatePicker(
       context: context,
@@ -77,7 +76,6 @@ class _HomePageState extends State<HomePage> {
   void aplicarFiltro() {
     List<Map<String, dynamic>> filtrados = expenses;
 
-    // 🔥 filtro por DIA
     if (dataSelecionada != null) {
       filtrados = filtrados.where((e) {
         final d = DateTime.parse(e['created_at']);
@@ -101,12 +99,13 @@ class _HomePageState extends State<HomePage> {
         0, (sum, e) => sum + (e['amount'] as num).toDouble());
   }
 
+  // 🔥 EXCLUIR
   Future<void> excluirGasto(String id, double valor) async {
     final confirmar = await showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Excluir gasto"),
-        content: const Text("Tem certeza que deseja excluir?"),
+        content: const Text("Tem certeza?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -134,13 +133,10 @@ class _HomePageState extends State<HomePage> {
 
     final atual = existing?['amount']?.toDouble() ?? 0;
 
-    await supabase.from('balance').upsert(
-      {
-        'user_id': user.id,
-        'amount': atual + valor,
-      },
-      onConflict: 'user_id',
-    );
+    await supabase.from('balance').upsert({
+      'user_id': user.id,
+      'amount': atual + valor,
+    }, onConflict: 'user_id');
 
     loadData();
   }
@@ -170,13 +166,10 @@ class _HomePageState extends State<HomePage> {
 
               final atual = existing?['amount']?.toDouble() ?? 0;
 
-              await supabase.from('balance').upsert(
-                {
-                  'user_id': user.id,
-                  'amount': atual + v,
-                },
-                onConflict: 'user_id',
-              );
+              await supabase.from('balance').upsert({
+                'user_id': user.id,
+                'amount': atual + v,
+              }, onConflict: 'user_id');
 
               Navigator.pop(context);
               loadData();
@@ -281,13 +274,10 @@ class _HomePageState extends State<HomePage> {
 
               final atual = existing?['amount']?.toDouble() ?? 0;
 
-              await supabase.from('balance').upsert(
-                {
-                  'user_id': user.id,
-                  'amount': atual - v,
-                },
-                onConflict: 'user_id',
-              );
+              await supabase.from('balance').upsert({
+                'user_id': user.id,
+                'amount': atual - v,
+              }, onConflict: 'user_id');
 
               Navigator.pop(context);
               loadData();
@@ -327,14 +317,61 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.deepPurple,
         title: const Text("Controle 💜",
             style: TextStyle(color: Colors.white)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+            onPressed: () => gerarPDF(listaFiltrada, categorias),
+          ),
+          IconButton(
+            icon: const Icon(Icons.bar_chart, color: Colors.white),
+            onPressed: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const GraphsPage()));
+            },
+          ),
+        ],
+      ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+              backgroundColor: Colors.green,
+              onPressed: adicionarSaldo,
+              child: const Icon(Icons.attach_money)),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+              backgroundColor: Colors.orange,
+              onPressed: novaCategoria,
+              child: const Icon(Icons.category)),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+              onPressed: novoGasto, child: const Icon(Icons.add)),
+        ],
       ),
       body: Column(
         children: [
-          const SizedBox(height: 10),
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xff6a11cb), Color(0xff2575fc)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Text("Saldo: R\$ ${saldo.toStringAsFixed(2)}",
+                    style: const TextStyle(color: Colors.white)),
+                Text("Despesas: R\$ ${totalDespesas.toStringAsFixed(2)}",
+                    style: const TextStyle(color: Colors.white70)),
+              ],
+            ),
+          ),
 
-          // 🔥 BOTÕES NOVOS
+          // 🔥 FILTROS BONITOS (SEM QUEBRAR)
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               ElevatedButton(
                 onPressed: selecionarData,
@@ -344,7 +381,6 @@ class _HomePageState extends State<HomePage> {
                       : "${dataSelecionada!.day}/${dataSelecionada!.month}/${dataSelecionada!.year}",
                 ),
               ),
-              const SizedBox(width: 10),
               TextButton(
                 onPressed: () {
                   setState(() {
@@ -354,11 +390,28 @@ class _HomePageState extends State<HomePage> {
                 },
                 child: const Text("Limpar"),
               ),
+              DropdownButton(
+                value: categoriaSelecionada,
+                items: [
+                  "Todas",
+                  ...categorias.map((c) => c['name'] as String)
+                ]
+                    .map((c) =>
+                        DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (v) {
+                  setState(() {
+                    categoriaSelecionada = v!;
+                    aplicarFiltro();
+                  });
+                },
+              ),
             ],
           ),
 
           Expanded(
             child: ListView.builder(
+              padding: const EdgeInsets.only(bottom: 100),
               itemCount: listaFiltrada.length,
               itemBuilder: (_, i) {
                 final item = listaFiltrada[i];
@@ -369,24 +422,45 @@ class _HomePageState extends State<HomePage> {
                         item['category_id'].toString(),
                     orElse: () => {});
 
-                return ListTile(
-                  title: Text(item['name'] ?? ""),
-                  subtitle: Text(cat['name'] ?? ""),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'excluir') {
-                        excluirGasto(
-                          item['id'].toString(),
-                          (item['amount'] as num).toDouble(),
-                        );
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'excluir',
-                        child: Text('Excluir'),
-                      ),
-                    ],
+                return Center(
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.9,
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(cat['emoji'] ?? "💰"),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(item['name'] ?? "")),
+                        Text("- R\$ ${item['amount']}",
+                            style: const TextStyle(color: Colors.red)),
+
+                        PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'excluir') {
+                              excluirGasto(
+                                item['id'].toString(),
+                                (item['amount'] as num).toDouble(),
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'editar',
+                              child: Text('Editar'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'excluir',
+                              child: Text('Excluir'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
